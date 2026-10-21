@@ -29,16 +29,16 @@ npm run desktop:build
 The build script creates a standalone Nitro Node server and packages it with Electron. The expected installer path is:
 
 ```text
-release/Wire-Setup-1.0.0-x64.exe
+release/Wire-Setup-1.0.1-x64.exe
 ```
 
 Run the installer, choose the installation directory, and launch **Wire** from the Start menu or desktop shortcut.
 
 ## Important current limitations
 
-- The chat and bot responses currently use the local simulation engine in `src/lib/wire/engine.ts` and `src/lib/wire/store.ts`.
-- Real Telegram account/session connectivity has not been implemented or verified by this packaging change.
-- Real Binance, Bybit, or Bitget execution has not been implemented or verified by this packaging change. Do not interpret simulated balances, prices, or command replies as live exchange data.
+- The desktop UI now sends commands to a loopback bridge in the already-running local bot. When the bridge is unavailable, Wire shows a connection error instead of inventing simulated results.
+- Wire is not a Telegram account client; it presents a Telegram-inspired interface for local bot commands.
+- The first bridge targets the existing Binance script only. Read-only commands and pair selection are exposed. Order placement, emergency sells, state resets, and buy-price changes are deliberately blocked in Wire until an explicit confirmation workflow is implemented.
 - This initial desktop build uses the existing local browser persistence for chat state. It does not yet provide a dedicated backup/restore workflow.
 - Build and test the installer on the target Windows PC before relying on it. This repository change adds the packaging workflow; it is not a claim that a Windows installer has already been built or tested.
 
