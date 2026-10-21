@@ -192,7 +192,7 @@ export const useDesk = create<DeskState>()(
             const now = Date.now();
             const newMessages: Message[] = replies.map((reply) => ({
               id: uid("m"), from: "bot", text: reply, ts: now,
-              tone: blocked ? "alert" : "normal", mono: /^\\s*(Spot Wallet:|\\w+\\/\\w+:)/.test(reply),
+              tone: blocked ? "alert" : "normal", mono: reply.startsWith("Spot Wallet:") || reply.includes(" pair added"),
             }));
             const active = get().activeId === id;
             set((s) => ({
