@@ -174,6 +174,7 @@ export const useDesk = create<DeskState>()(
             let replies: string[] = [];
             let connected = false;
             let blocked = false;
+            let snapshotData: any = null;
             try {
               const response = await fetch("http://127.0.0.1:47832/command", {
                 method: "POST",
@@ -186,6 +187,10 @@ export const useDesk = create<DeskState>()(
               blocked = Boolean(data.blocked) || !response.ok;
               replies = Array.isArray(data.replies) ? data.replies.map((v: unknown) => String(v)) :
                 [String(data.error || (response.ok ? "The real script returned no response." : "The real script rejected the command."))];
+              try {
+                const snapResponse = await fetch("http://127.0.0.1:47832/snapshot", { cache: "no-store" });
+                if (snapResponse.ok) snapshotData = await snapResponse.json();
+              } catch { /* command reply remains usable without a snapshot */ }
             } catch {
               replies = ["REAL SCRIPT NOT CONNECTED. Start your existing Binance bot with the Wire bridge installed. No simulated command was executed."];
             }
@@ -200,6 +205,11 @@ export const useDesk = create<DeskState>()(
                 ...b,
                 online: connected,
                 lastSeen: connected ? now : b.lastSeen,
+                lanes: snapshotData ? {
+                  USDT: { ...b.lanes.USDT, symbol: snapshotData.activePair || null, lastSymbol: snapshotData.activePair || null },
+                  USDC: { ...b.lanes.USDC, symbol: snapshotData.activePairUSDC || null, lastSymbol: snapshotData.activePairUSDC || null },
+                } : b.lanes,
+                isaac: snapshotData?.isaacPair ? { ...b.isaac, symbol: snapshotData.isaacPair } : b.isaac,
                 messages: [...b.messages.map((m) => m.id === job.id ? { ...m, pending: false } : m), ...newMessages],
                 inbox: b.inbox.filter((j) => j.id !== job.id),
                 typing: false,
