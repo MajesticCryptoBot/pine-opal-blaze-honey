@@ -4,8 +4,8 @@ This repository can be launched as a normal Windows desktop window with Electron
 
 ## Requirements
 
-- Windows 10/11, 64-bit
-- Node.js 22 LTS or a compatible supported Node release
+- Windows 10/11, 64-bit for the installed app
+- Node.js 22 LTS (only if building from source)
 - Git (only if cloning the repository)
 
 ## Run the desktop app during development
@@ -19,7 +19,7 @@ The Electron window starts the existing Vite development server on `127.0.0.1:80
 
 ## Build the Windows installer
 
-Run these commands in PowerShell from the repository root on a Windows x64 PC:
+To build the installer yourself, run these commands in PowerShell from the repository root on a Windows x64 PC:
 
 ```powershell
 npm install
