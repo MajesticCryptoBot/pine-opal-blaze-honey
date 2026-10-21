@@ -1,17 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import {
-  applyUserText,
-  createBot,
-  pushReplies,
-  seedBots,
-  tickBot,
-  uid,
-  type Bot,
-  type Exchange,
-  type Message,
-  type Reply,
-} from "@/lib/wire/engine";
+import { createBot, seedBots, uid, type Bot, type Exchange, type Message, type Reply } from "@/lib/wire/engine";
 
 type DeskState = {
   bots: Bot[];
@@ -32,10 +21,6 @@ type DeskState = {
 };
 
 const draining = new Set<string>();
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 let audioCtx: AudioContext | null = null;
 
@@ -139,53 +124,19 @@ export const useDesk = create<DeskState>()(
           from: "me",
           text: trimmed,
           ts: Date.now(),
-          pending: !bot.online,
+          pending: true,
         };
-        const notice: Message[] =
-          !bot.online && !bot.messages.some((m) => m.pending)
-            ? [
-                {
-                  id: uid("m"),
-                  from: "service",
-                  text: "Bot is offline. This message will send when it is back.",
-                  ts: Date.now(),
-                  tone: "service",
-                },
-              ]
-            : [];
         set((s) => ({
           bots: s.bots.map((b) =>
             b.id === id
-              ? { ...b, messages: [...b.messages, mine, ...notice], inbox: [...b.inbox, { id: jobId, text: trimmed }], unread: 0 }
+              ? { ...b, messages: [...b.messages, mine], inbox: [...b.inbox, { id: jobId, text: trimmed }], unread: 0 }
               : b,
           ),
         }));
-        if (bot.online) void get().drain(id);
+        void get().drain(id);
       },
       tickAll: () => {
-        const activeId = get().activeId;
-        const sound = get().sound;
-        let played = false;
-        set((s) => ({
-          bots: s.bots.map((b) => {
-            if (!b.online || b.typing || b.inbox.length) return b;
-            const { bot, replies } = tickBot(b, Date.now());
-            if (!replies.length) return { ...bot, messages: b.messages, inbox: b.inbox, typing: false, unread: b.unread };
-            const pushed = pushReplies(b.messages, replies, Date.now());
-            const active = b.id === activeId;
-            if (!played) {
-              soundFor(replies, active, sound);
-              played = replies.some((r) => r.tone === "trade" || r.tone === "alert" || !active);
-            }
-            return {
-              ...bot,
-              messages: pushed.messages,
-              inbox: b.inbox,
-              typing: false,
-              unread: active ? 0 : b.unread + pushed.unreadAdd,
-            };
-          }),
-        }));
+        // Live values must come from the real script bridge, never the demo simulator.
       },
       drain: async (id: string) => {
         if (draining.has(id)) return;
@@ -194,63 +145,54 @@ export const useDesk = create<DeskState>()(
           for (;;) {
             const bot = get().bots.find((b) => b.id === id);
             if (!bot || bot.inbox.length === 0) break;
-            if (!bot.online) break;
             const job = bot.inbox[0];
-            set((s) => ({
-              bots: s.bots.map((b) => (b.id === id ? { ...b, typing: true } : b)),
+            set((s) => ({ bots: s.bots.map((b) => b.id === id ? { ...b, typing: true } : b) }));
+            let replies: string[] = [];
+            let connected = false;
+            let blocked = false;
+            try {
+              const response = await fetch("http://127.0.0.1:47832/command", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                cache: "no-store",
+                body: JSON.stringify({ text: job.text }),
+              });
+              const data = await response.json().catch(() => ({}));
+              connected = true;
+              blocked = Boolean(data.blocked) || !response.ok;
+              replies = Array.isArray(data.replies) ? data.replies.map((v: unknown) => String(v)) :
+                [String(data.error || (response.ok ? "The real script returned no response." : "The real script rejected the command."))];
+            } catch {
+              replies = ["REAL SCRIPT NOT CONNECTED. Start your existing Binance bot with the Wire bridge installed. No simulated command was executed."];
+            }
+            const now = Date.now();
+            const newMessages: Message[] = replies.map((reply) => ({
+              id: uid("m"), from: "bot", text: reply, ts: now,
+              tone: blocked ? "alert" : "normal", mono: /^\\s*(Spot Wallet:|\\w+\\/\\w+:)/.test(reply),
             }));
-            const slow = /^\/(status|compound_status|isaac_status)/.test(job.text);
-            await sleep(slow ? 720 : 480);
-            const cur = get().bots.find((b) => b.id === id);
-            if (!cur || cur.inbox[0]?.id !== job.id) {
-              set((s) => ({ bots: s.bots.map((b) => (b.id === id ? { ...b, typing: false } : b)) }));
-              continue;
-            }
-            if (!cur.online) {
-              set((s) => ({
-                bots: s.bots.map((b) =>
-                  b.id === id
-                    ? {
-                        ...b,
-                        typing: false,
-                        messages: b.messages.map((m) => (m.id === job.id ? { ...m, pending: true } : m)),
-                      }
-                    : b,
-                ),
-              }));
-              break;
-            }
-            const applied = applyUserText(cur, job.text, Date.now());
-            const pushed = pushReplies(
-              cur.messages.map((m) => (m.id === job.id ? { ...m, pending: false } : m)),
-              applied.replies,
-              Date.now(),
-            );
             const active = get().activeId === id;
             set((s) => ({
-              bots: s.bots.map((b) =>
-                b.id !== id
-                  ? b
-                  : {
-                      ...applied.bot,
-                      messages: pushed.messages,
-                      inbox: b.inbox.filter((j) => j.id !== job.id),
-                      typing: false,
-                      unread: active ? 0 : b.unread + (active ? 0 : pushed.unreadAdd),
-                    },
-              ),
+              bots: s.bots.map((b) => b.id !== id ? b : {
+                ...b,
+                online: connected,
+                lastSeen: connected ? now : b.lastSeen,
+                messages: [...b.messages.map((m) => m.id === job.id ? { ...m, pending: false } : m), ...newMessages],
+                inbox: b.inbox.filter((j) => j.id !== job.id),
+                typing: false,
+                unread: active ? 0 : b.unread + newMessages.length,
+              }),
             }));
-            soundFor(applied.replies, active, get().sound);
+            soundFor(replies.map((text) => ({ text, tone: blocked ? "alert" : "normal" as const })), active, get().sound);
           }
         } finally {
           draining.delete(id);
           const bot = get().bots.find((b) => b.id === id);
-          if (bot && bot.online && bot.inbox.length) void get().drain(id);
+          if (bot && bot.inbox.length) void get().drain(id);
         }
       },
     }),
     {
-      name: "wire-desk-v1",
+      name: "wire-desk-v2",
       partialize: (s) => ({
         bots: s.bots.map((b) => ({ ...b, typing: false, inbox: b.online ? [] : b.inbox })),
         activeId: s.activeId,
