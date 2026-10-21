@@ -43,4 +43,4 @@ if (!existsSync(serverEntry)) {
 
 console.log("Packaging the Windows x64 installer. Run this on Windows for the intended result...");
 run(npm, ["run", "desktop:package"], { WIRE_DESKTOP_BUILD: "1" });
-console.log("\nWindows installer build completed. Check the release folder for Wire-Setup-1.0.0-x64.exe.");
+console.log("\nWindows installer build completed. Check the release folder for Wire-Setup-1.0.1-x64.exe.");
