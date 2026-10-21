@@ -197,7 +197,7 @@ export const useDesk = create<DeskState>()(
             const now = Date.now();
             const newMessages: Message[] = replies.map((reply) => ({
               id: uid("m"), from: "bot", text: reply, ts: now,
-              tone: blocked ? "alert" : "normal", mono: reply.startsWith("Spot Wallet:") || reply.includes(" pair added"),
+              tone: (blocked ? "alert" : "normal") as const, mono: reply.startsWith("Spot Wallet:") || reply.includes(" pair added"),
             }));
             const active = get().activeId === id;
             set((s) => ({
@@ -216,7 +216,7 @@ export const useDesk = create<DeskState>()(
                 unread: active ? 0 : b.unread + newMessages.length,
               }),
             }));
-            soundFor(replies.map((text) => ({ text, tone: blocked ? "alert" : "normal" as const })), active, get().sound);
+            soundFor(replies.map((text) => ({ text, tone: (blocked ? "alert" : "normal") as const })), active, get().sound);
           }
         } finally {
           draining.delete(id);
