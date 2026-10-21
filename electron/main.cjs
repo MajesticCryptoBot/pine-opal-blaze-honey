@@ -43,6 +43,15 @@ function getServerRoot() {
   return path.join(process.resourcesPath, "wire-server");
 }
 
+function isInternalUrl(value) {
+  try {
+    const origin = new URL(value).origin;
+    return origin === APP_URL || origin === "http://127.0.0.1:8080";
+  } catch {
+    return false;
+  }
+}
+
 function startProductionServer() {
   const root = getServerRoot();
   const entry = path.join(root, ".output", "server", "index.mjs");
@@ -133,7 +142,7 @@ function createWindow() {
     return { action: "deny" };
   });
   mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (!url.startsWith(APP_URL) && !url.startsWith("http://127.0.0.1:8080")) {
+    if (!isInternalUrl(url)) {
       event.preventDefault();
       if (url.startsWith("https://") || url.startsWith("http://")) {
         shell.openExternal(url).catch((error) => console.error("Could not open external URL:", error));
