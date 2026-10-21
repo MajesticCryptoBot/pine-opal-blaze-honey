@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, shell, dialog, utilityProcess } = require("electron");
 const { spawn } = require("node:child_process");
 const { existsSync } = require("node:fs");
 const path = require("node:path");
@@ -8,6 +8,8 @@ const HOST = "127.0.0.1";
 const PORT = 47831;
 const APP_URL = `http://${HOST}:${PORT}`;
 let serverProcess = null;
+let serverExited = false;
+let serverExitCode = null;
 let devProcess = null;
 let mainWindow = null;
 let shuttingDown = false;
@@ -20,8 +22,11 @@ async function waitForServer(url, child, timeoutMs = 45000) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
-    if (child && child.exitCode !== null) {
-      throw new Error(`The app server exited early (code ${child.exitCode}).`);
+    if (child === serverProcess && serverExited) {
+      throw new Error(`The app server exited early (code ${serverExitCode ?? "unknown"}).`);
+    }
+    if (child === devProcess && child && child.exitCode !== null) {
+      throw new Error(`The development server exited early (code ${child.exitCode}).`);
     }
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(1800) });
@@ -46,13 +51,14 @@ function startProductionServer() {
     throw new Error(`The packaged server is missing: ${entry}`);
   }
 
-  serverProcess = spawn(process.execPath, [entry], {
+  serverExited = false;
+  serverExitCode = null;
+  serverProcess = utilityProcess.fork(entry, [], {
     cwd: root,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
+    serviceName: "Wire local app server",
+    stdio: "pipe",
     env: {
       ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: "production",
       HOST,
       NITRO_HOST: HOST,
@@ -63,8 +69,9 @@ function startProductionServer() {
   });
   serverProcess.stdout.on("data", (chunk) => console.log("[wire-server]", String(chunk).trimEnd()));
   serverProcess.stderr.on("data", (chunk) => console.error("[wire-server]", String(chunk).trimEnd()));
-  serverProcess.on("error", (error) => console.error("[wire-server] process error:", error));
   serverProcess.on("exit", (code) => {
+    serverExited = true;
+    serverExitCode = code;
     if (!shuttingDown && code !== 0 && mainWindow && !mainWindow.isDestroyed()) {
       dialog.showErrorBox("Wire server stopped", `The local application server stopped unexpectedly (exit code ${code ?? "unknown"}).`);
     }
