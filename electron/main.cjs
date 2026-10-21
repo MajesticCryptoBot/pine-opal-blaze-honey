@@ -2,7 +2,6 @@ const { app, BrowserWindow, shell, dialog, utilityProcess } = require("electron"
 const { spawn } = require("node:child_process");
 const { existsSync } = require("node:fs");
 const path = require("node:path");
-const http = require("node:http");
 
 const HOST = "127.0.0.1";
 const PORT = 47831;
