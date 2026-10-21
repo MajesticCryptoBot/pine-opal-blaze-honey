@@ -118,13 +118,6 @@
       {
         "from": "node_modules",
         "to": "wire-server/node_modules"
-      },
-      {
-        "from": "migrations",
-        "to": "wire-server/migrations",
-        "filter": [
-          "**/*"
-        ]
       }
     ],
     "win": {
@@ -146,5 +139,6 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Wire"
     }
-  }
+  },
+  "version": "1.0.0"
 }
