@@ -44,8 +44,17 @@ async def health(request):
 
 async def snapshot(request):
     try:
+        active_usdt = _ns["active_last_symbol"]() if _ns else None
+        active_usdc = None
+        slot = _ns.get("ACTIVE_SLOT") if _ns else None
+        slot_token = slot.set("USDC") if slot is not None else None
+        try:
+            active_usdc = _ns["active_last_symbol"]() if _ns else None
+        finally:
+            if slot_token is not None:
+                slot.reset(slot_token)
         return web.json_response({"ok": True, "connected": _ns is not None,
-            "activePair": _ns["active_last_symbol"]() if _ns else None,
+            "activePair": active_usdt, "activePairUSDC": active_usdc,
             "isaacPair": _ns.get("ISAAC_DCA_SYMBOL") if _ns else None})
     except Exception as exc:
         return web.json_response({"ok": False, "error": str(exc)}, status=500)
