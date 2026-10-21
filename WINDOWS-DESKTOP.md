@@ -1,6 +1,6 @@
 # Wire for Windows
 
-This repository can be launched as a normal Windows desktop window with Electron. The desktop wrapper packages the existing web app and its local Node server; it does not turn the current simulated trading engine into a live Telegram or exchange integration.
+This repository can be launched as a normal Windows desktop window with Electron. The desktop UI now has a local bridge protocol for the existing Binance bot process; it does not sign in to a Telegram account or start a second trading loop.
 
 ## Requirements
 
