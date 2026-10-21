@@ -75,35 +75,48 @@ export const useDesk = create<DeskState>()(
       toggleOnline: (id) => {
         const bot = get().bots.find((b) => b.id === id);
         if (!bot) return;
-        const online = !bot.online;
-        set((s) => ({
-          bots: s.bots.map((b) =>
-            b.id === id
-              ? {
-                  ...b,
-                  online,
-                  lastSeen: Date.now(),
-                  typing: false,
-                  messages: online
-                    ? [
-                        ...b.messages,
-                        {
-                          id: uid("m"),
-                          from: "service" as const,
-                          text: "Bot is online.",
-                          ts: Date.now(),
-                          tone: "service" as const,
-                        },
-                      ]
-                    : b.messages,
-                }
-              : b,
-          ),
-        }));
-        if (online) void get().drain(id);
+        if (bot.name !== "ABinanceTradingBot (local)") {
+          set((s) => ({ bots: s.bots.map((b) => b.id === id ? {
+            ...b, online: false, lastSeen: Date.now(),
+            messages: [...b.messages, { id: uid("m"), from: "service",
+              text: "No real script is registered for this profile. Simulation is disabled.",
+              ts: Date.now(), tone: "alert" }],
+          } : b) }));
+          return;
+        }
+        void fetch("http://127.0.0.1:47832/health", { cache: "no-store" })
+          .then(async (response) => {
+            if (!response.ok) throw new Error("Bridge unavailable");
+            const data = await response.json();
+            set((s) => ({ bots: s.bots.map((b) => b.id === id ? {
+              ...b, online: Boolean(data.connected), lastSeen: Date.now(),
+              messages: [...b.messages, { id: uid("m"), from: "service",
+                text: data.connected ? "Connected to the real local Binance script." : "Bridge is running but the script is not connected.",
+                ts: Date.now(), tone: "service" }],
+            } : b) }));
+          })
+          .catch(() => set((s) => ({ bots: s.bots.map((b) => b.id === id ? {
+            ...b, online: false, lastSeen: Date.now(),
+            messages: [...b.messages, { id: uid("m"), from: "service",
+              text: "Local script bridge is unavailable. No simulated data is used.",
+              ts: Date.now(), tone: "alert" }],
+          } : b) })));
       },
       addBot: (name, exchange) => {
-        const bot = createBot({ name, exchange, online: true });
+        const bot = createBot({ name, exchange, online: false });
+        bot.lanes.USDT = { symbol: null, lastSymbol: null, allocated: 0, rescuePool: 0, position: null };
+        bot.lanes.USDC = { symbol: null, lastSymbol: null, allocated: 0, rescuePool: 0, position: null };
+        bot.isaac.orders = [];
+        bot.isaac.virtualUsdt = 0;
+        bot.isaac.allocated = 0;
+        bot.wallet = {};
+        bot.history = [];
+        bot.prices = {};
+        bot.anchors = {};
+        bot.series = {};
+        bot.messages = [{ id: uid("m"), from: "service",
+          text: "No real local script is registered for this profile yet. Simulation is disabled.",
+          ts: Date.now(), tone: "service" }];
         set((s) => ({ bots: [...s.bots, bot], activeId: bot.id }));
       },
       removeBot: (id) =>
@@ -145,6 +158,17 @@ export const useDesk = create<DeskState>()(
           for (;;) {
             const bot = get().bots.find((b) => b.id === id);
             if (!bot || bot.inbox.length === 0) break;
+            if (bot.name !== "ABinanceTradingBot (local)") {
+              const job = bot.inbox[0];
+              const now = Date.now();
+              set((s) => ({ bots: s.bots.map((b) => b.id !== id ? b : {
+                ...b,
+                messages: [...b.messages.map((m) => m.id === job.id ? { ...m, pending: false } : m),
+                  { id: uid("m"), from: "bot", text: "No real script is registered for this profile. No simulated command was executed.", ts: now, tone: "alert" }],
+                inbox: b.inbox.filter((j) => j.id !== job.id), typing: false, online: false,
+              }) }));
+              continue;
+            }
             const job = bot.inbox[0];
             set((s) => ({ bots: s.bots.map((b) => b.id === id ? { ...b, typing: true } : b) }));
             let replies: string[] = [];
