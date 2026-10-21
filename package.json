@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "desktop:dev": "electron .",
     "desktop:build": "node scripts/build-windows.mjs",
-    "desktop:package": "electron-builder --win nsis"
+    "desktop:package": "electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
