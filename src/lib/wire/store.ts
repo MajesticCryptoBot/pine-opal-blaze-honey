@@ -228,7 +228,7 @@ export const useDesk = create<DeskState>()(
     {
       name: "wire-desk-v2",
       partialize: (s) => ({
-        bots: s.bots.map((b) => ({ ...b, typing: false, inbox: b.online ? [] : b.inbox })),
+        bots: s.bots.map((b) => ({ ...b, typing: false, inbox: [] })),
         activeId: s.activeId,
         sound: s.sound,
         infoOpen: s.infoOpen,
